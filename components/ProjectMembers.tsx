@@ -36,9 +36,10 @@ interface ProjectMembersProps {
   projectId: string
   members: Member[]
   isOwnerOrAdmin: boolean
+  onMemberAdded?: () => void
 }
 
-export default function ProjectMembers({ projectId, members, isOwnerOrAdmin }: ProjectMembersProps) {
+export default function ProjectMembers({ projectId, members, isOwnerOrAdmin, onMemberAdded }: ProjectMembersProps) {
   const [showAddMember, setShowAddMember] = useState(false)
   const [newMemberEmail, setNewMemberEmail] = useState("")
   const [newMemberRole, setNewMemberRole] = useState("member")
@@ -64,7 +65,9 @@ export default function ProjectMembers({ projectId, members, isOwnerOrAdmin }: P
       setNewMemberEmail("")
       setNewMemberRole("member")
       setShowAddMember(false)
-      // In a real app, you'd refresh the members list here
+      if (onMemberAdded) {
+        onMemberAdded()
+      }
     } catch (error: any) {
       toast({
         title: "Failed to add member",

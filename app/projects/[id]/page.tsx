@@ -238,7 +238,12 @@ export default function ProjectDetailPage() {
           </TabsContent>
 
           <TabsContent value="team" className="space-y-6">
-            <ProjectMembers projectId={project._id} members={project.members} isOwnerOrAdmin={isOwnerOrAdmin} />
+            <ProjectMembers
+              projectId={project._id}
+              members={project.members}
+              isOwnerOrAdmin={isOwnerOrAdmin}
+              onMemberAdded={fetchProject}
+            />
           </TabsContent>
 
           <TabsContent value="chat" className="space-y-6">

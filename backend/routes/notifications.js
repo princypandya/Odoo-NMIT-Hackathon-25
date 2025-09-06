@@ -15,7 +15,17 @@ router.use(authenticateToken)
 // GET /api/notifications - Get user notifications
 router.get("/", async (req, res) => {
   try {
+    console.log("[v0] Notifications route hit")
+    console.log("[v0] User from auth:", req.user)
+
+    if (!req.user || !req.user.uid) {
+      console.log("[v0] No user found in request")
+      return res.status(401).json({ message: "User not authenticated" })
+    }
+
     const userId = req.user.uid
+    console.log("[v0] Fetching notifications for user:", userId)
+
     const { page = 1, limit = 20, unreadOnly = false } = req.query
 
     const filter = { userId }
@@ -32,14 +42,16 @@ router.get("/", async (req, res) => {
 
     const unreadCount = await Notification.countDocuments({ userId, read: false })
 
+    console.log("[v0] Successfully fetched notifications:", notifications.length)
+
     res.json({
       notifications,
       unreadCount,
       hasMore: notifications.length === limit,
     })
   } catch (error) {
-    console.error("Error fetching notifications:", error)
-    res.status(500).json({ message: "Failed to fetch notifications" })
+    console.error("[v0] Error fetching notifications:", error)
+    res.status(500).json({ message: "Failed to fetch notifications", error: error.message })
   }
 })
 

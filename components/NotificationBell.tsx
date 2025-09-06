@@ -33,6 +33,7 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -40,64 +41,92 @@ export default function NotificationBell() {
     if (user) {
       fetchNotifications()
       setupRealtimeNotifications()
+    } else {
+      setLoading(false)
     }
   }, [user])
 
   const fetchNotifications = async () => {
     try {
+      if (!user) {
+        setLoading(false)
+        return
+      }
+
       const response = await api.get("/notifications?limit=10")
-      setNotifications(response.data.notifications)
-      setUnreadCount(response.data.unreadCount)
-    } catch (error) {
+      setNotifications(response.data.notifications || [])
+      setUnreadCount(response.data.unreadCount || 0)
+      setHasError(false)
+    } catch (error: any) {
       console.error("Failed to fetch notifications:", error)
+      setHasError(true)
+      setNotifications([])
+      setUnreadCount(0)
+
+      if (error?.response?.status !== 500 && error?.response?.status !== 404) {
+        toast({
+          title: "Error",
+          description: "Failed to load notifications",
+          variant: "destructive",
+        })
+      }
     } finally {
       setLoading(false)
     }
   }
 
   const setupRealtimeNotifications = () => {
-    const socket = io(process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000")
+    try {
+      if (hasError) return
 
-    socket.emit("joinUserRoom", user?.uid)
-
-    socket.on("newNotification", (notification: Notification) => {
-      setNotifications((prev) => [notification, ...prev.slice(0, 9)])
-      setUnreadCount((prev) => prev + 1)
-
-      toast({
-        title: notification.title,
-        description: notification.message,
+      const socket = io(process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000", {
+        timeout: 5000,
+        forceNew: true,
       })
-    })
 
-    return () => socket.disconnect()
+      socket.emit("joinUserRoom", user?.uid)
+
+      socket.on("newNotification", (notification: Notification) => {
+        setNotifications((prev) => [notification, ...prev.slice(0, 9)])
+        setUnreadCount((prev) => prev + 1)
+
+        toast({
+          title: notification.title,
+          description: notification.message,
+        })
+      })
+
+      socket.on("connect_error", (error) => {
+        console.warn("Socket connection failed:", error)
+      })
+
+      return () => socket.disconnect()
+    } catch (error) {
+      console.warn("Failed to setup real-time notifications:", error)
+    }
   }
 
   const markAsRead = async (notificationId: string) => {
+    if (hasError || !user) return
+
     try {
       await api.put(`/notifications/${notificationId}/read`)
       setNotifications((prev) => prev.map((n) => (n._id === notificationId ? { ...n, read: true } : n)))
       setUnreadCount((prev) => Math.max(0, prev - 1))
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to mark notification as read",
-        variant: "destructive",
-      })
+      console.error("Failed to mark notification as read:", error)
     }
   }
 
   const markAllAsRead = async () => {
+    if (hasError || !user) return
+
     try {
       await api.put("/notifications/read-all")
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
       setUnreadCount(0)
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to mark all notifications as read",
-        variant: "destructive",
-      })
+      console.error("Failed to mark all notifications as read:", error)
     }
   }
 
@@ -119,7 +148,7 @@ export default function NotificationBell() {
       <DropdownMenuContent className="w-80" align="end">
         <div className="flex items-center justify-between p-2 border-b">
           <h3 className="font-semibold">Notifications</h3>
-          {unreadCount > 0 && (
+          {unreadCount > 0 && !hasError && (
             <Button variant="ghost" size="sm" onClick={markAllAsRead}>
               <Check className="h-4 w-4 mr-1" />
               Mark all read
@@ -129,6 +158,11 @@ export default function NotificationBell() {
         <div className="max-h-96 overflow-y-auto">
           {loading ? (
             <div className="p-4 text-center">Loading...</div>
+          ) : hasError ? (
+            <div className="p-4 text-center text-muted-foreground">
+              <p>Unable to load notifications</p>
+              <p className="text-xs mt-1">Backend server may not be running</p>
+            </div>
           ) : notifications.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">No notifications yet</div>
           ) : (

@@ -186,39 +186,77 @@ router.delete("/:id", async (req, res) => {
 // POST /api/projects/:id/members - Add team member
 router.post("/:id/members", async (req, res) => {
   try {
+    console.log("[v0] Add member request received:", {
+      projectId: req.params.id,
+      body: req.body,
+      userId: req.user?.uid,
+    })
+
     const projectId = req.params.id
     const userId = req.user.uid
     const { email, role = "member" } = req.body
 
+    console.log("[v0] Looking for project with ID:", projectId)
     const project = await Project.findOne({
       _id: projectId,
       $or: [{ createdBy: userId }, { "members.userId": userId, "members.role": { $in: ["owner", "admin"] } }],
     })
 
     if (!project) {
+      console.log("[v0] Project not found or insufficient permissions")
       return res.status(404).json({ message: "Project not found or insufficient permissions" })
     }
 
-    // Find user by email (this would need Firebase Admin SDK to get user by email)
-    // For now, we'll assume the email is provided and valid
+    console.log("[v0] Project found, resolving email to Firebase UID:", email)
+    let targetUserId
+    try {
+      const admin = require("../config/firebase")
+      console.log("[v0] Firebase admin initialized, getting user by email")
+      const userRecord = await admin.auth().getUserByEmail(email)
+      targetUserId = userRecord.uid
+      console.log("[v0] Firebase user found:", { uid: targetUserId, email: userRecord.email })
+
+      // Create or update user record in our database
+      console.log("[v0] Creating/updating user record in database")
+      await User.findOneAndUpdate(
+        { firebaseUid: targetUserId },
+        {
+          firebaseUid: targetUserId,
+          email: userRecord.email,
+          displayName: userRecord.displayName || userRecord.email,
+          lastActive: new Date(),
+        },
+        { upsert: true, new: true },
+      )
+      console.log("[v0] User record created/updated successfully")
+    } catch (firebaseError) {
+      console.error("[v0] Firebase error:", firebaseError)
+      return res.status(400).json({
+        message: "User not found. Please make sure the email is registered in the system.",
+      })
+    }
+
+    // Check if user is already a member
+    const existingMember = project.members.find((m) => m.userId === targetUserId)
+    if (existingMember) {
+      console.log("[v0] User is already a member")
+      return res.status(400).json({ message: "User is already a member of this project" })
+    }
+
     const newMember = {
-      userId: email, // This should be the Firebase UID in a real implementation
+      userId: targetUserId,
       role,
       joinedAt: new Date(),
     }
 
-    // Check if user is already a member
-    const existingMember = project.members.find((m) => m.userId === newMember.userId)
-    if (existingMember) {
-      return res.status(400).json({ message: "User is already a member of this project" })
-    }
-
+    console.log("[v0] Adding new member:", newMember)
     project.members.push(newMember)
     await project.save()
+    console.log("[v0] Member added successfully, project saved")
 
     res.json({ message: "Member added successfully", member: newMember })
   } catch (error) {
-    console.error("Error adding member:", error)
+    console.error("[v0] Error adding member:", error)
     res.status(500).json({ message: "Failed to add member" })
   }
 })
