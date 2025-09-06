@@ -17,6 +17,7 @@ const projectRoutes = require("./routes/projects")
 const taskRoutes = require("./routes/tasks")
 const messageRoutes = require("./routes/messages")
 const { router: notificationRoutes, createNotification } = require("./routes/notifications")
+const analyticsRoutes = require("./routes/analytics")
 
 const app = express()
 const server = http.createServer(app)
@@ -52,6 +53,7 @@ app.use("/api/projects", projectRoutes)
 app.use("/api", taskRoutes) // Added task routes
 app.use("/api/messages", messageRoutes)
 app.use("/api/notifications", notificationRoutes)
+app.use("/api/analytics", analyticsRoutes)
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
