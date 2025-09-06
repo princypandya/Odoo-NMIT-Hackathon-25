@@ -1,12 +1,12 @@
 const express = require("express")
 const router = express.Router()
-const auth = require("../middleware/auth")
+const { authenticateToken } = require("../middleware/auth")
 const Task = require("../models/Task")
 const Project = require("../models/Project")
 const User = require("../models/User")
 
 // Get dashboard analytics
-router.get("/dashboard", auth, async (req, res) => {
+router.get("/dashboard", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.uid
 
@@ -137,7 +137,7 @@ router.get("/dashboard", auth, async (req, res) => {
 })
 
 // Get project progress data
-router.get("/projects/progress", auth, async (req, res) => {
+router.get("/projects/progress", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.uid
 
