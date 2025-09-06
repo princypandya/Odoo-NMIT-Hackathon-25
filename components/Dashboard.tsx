@@ -39,10 +39,15 @@ export default function Dashboard() {
 
   const fetchProjects = async () => {
     try {
+      console.log("[v0] Dashboard: Fetching projects for user")
       const response = await api.get("/projects")
+      console.log("[v0] Dashboard: Received projects:", response.data.length)
       setProjects(response.data)
     } catch (error) {
       console.error("Failed to fetch projects:", error)
+      if (error.response) {
+        console.error("[v0] Dashboard: API error response:", error.response.status, error.response.data)
+      }
     } finally {
       setLoading(false)
     }

@@ -17,11 +17,23 @@ router.use(authenticateToken)
 router.get("/", async (req, res) => {
   try {
     const userId = req.user.uid
+    console.log("[v0] Fetching projects for user:", userId)
 
     // Find projects where user is a member or creator
     const projects = await Project.find({
       $or: [{ createdBy: userId }, { "members.userId": userId }],
     }).sort({ updatedAt: -1 })
+
+    console.log("[v0] Found projects:", projects.length)
+    console.log(
+      "[v0] Project details:",
+      projects.map((p) => ({
+        id: p._id,
+        name: p.name,
+        createdBy: p.createdBy,
+        members: p.members.map((m) => ({ userId: m.userId, role: m.role })),
+      })),
+    )
 
     // Get task statistics for each project
     const Task = require("../models/Task")
@@ -189,7 +201,7 @@ router.post("/:id/members", async (req, res) => {
     console.log("[v0] Add member request received:", {
       projectId: req.params.id,
       body: req.body,
-      userId: req.user?.uid,
+      requestingUserId: req.user?.uid,
     })
 
     const projectId = req.params.id
@@ -216,9 +228,8 @@ router.post("/:id/members", async (req, res) => {
       targetUserId = userRecord.uid
       console.log("[v0] Firebase user found:", { uid: targetUserId, email: userRecord.email })
 
-      // Create or update user record in our database
       console.log("[v0] Creating/updating user record in database")
-      await User.findOneAndUpdate(
+      const dbUser = await User.findOneAndUpdate(
         { firebaseUid: targetUserId },
         {
           firebaseUid: targetUserId,
@@ -228,7 +239,11 @@ router.post("/:id/members", async (req, res) => {
         },
         { upsert: true, new: true },
       )
-      console.log("[v0] User record created/updated successfully")
+      console.log("[v0] User record created/updated successfully:", {
+        dbUserId: dbUser._id,
+        firebaseUid: dbUser.firebaseUid,
+        email: dbUser.email,
+      })
     } catch (firebaseError) {
       console.error("[v0] Firebase error:", firebaseError)
       return res.status(400).json({
@@ -253,6 +268,20 @@ router.post("/:id/members", async (req, res) => {
     project.members.push(newMember)
     await project.save()
     console.log("[v0] Member added successfully, project saved")
+
+    console.log(
+      "[v0] Updated project members:",
+      project.members.map((m) => ({
+        userId: m.userId,
+        role: m.role,
+        joinedAt: m.joinedAt,
+      })),
+    )
+
+    const testQuery = await Project.find({
+      $or: [{ createdBy: targetUserId }, { "members.userId": targetUserId }],
+    })
+    console.log("[v0] Test query for new member - found projects:", testQuery.length)
 
     res.json({ message: "Member added successfully", member: newMember })
   } catch (error) {

@@ -106,6 +106,12 @@ export default function ProjectMembers({ projectId, members, isOwnerOrAdmin, onM
     return userId.slice(0, 2).toUpperCase()
   }
 
+  const getUserDisplayName = (userId: string) => {
+    // In a real app, you'd fetch user details from the database
+    // For now, show a truncated version of the Firebase UID
+    return `User ${userId.slice(-6)}`
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -182,7 +188,8 @@ export default function ProjectMembers({ projectId, members, isOwnerOrAdmin, onM
                   </Avatar>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-medium">{member.userId}</p>
+                      <p className="font-medium">{getUserDisplayName(member.userId)}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{member.userId}</p>
                       {getRoleIcon(member.role)}
                     </div>
                     <p className="text-sm text-muted-foreground">
